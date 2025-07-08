@@ -1,13 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import { RawPair } from "./types";
+import { RawPair, StreamingDetails, ParsedChunk } from "./types";
 import { HTMLGenerator } from "./html-generator";
 
 export interface InterceptorConfig {
 	logDirectory?: string;
 	enableRealTimeHTML?: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error";
+	maxLogSize?: number; // bytes, default 3MB
 }
 
 export class ClaudeTrafficLogger {
@@ -22,8 +23,9 @@ export class ClaudeTrafficLogger {
 	constructor(config: InterceptorConfig = {}) {
 		this.config = {
 			logDirectory: ".claude-trace",
-			enableRealTimeHTML: true,
+			enableRealTimeHTML: false,
 			logLevel: "info",
+			maxLogSize: 3 * 1024 * 1024, // 3MB
 			...config,
 		};
 
@@ -135,7 +137,9 @@ export class ClaudeTrafficLogger {
 		return body;
 	}
 
-	private async parseResponseBody(response: Response): Promise<{ body?: any; body_raw?: string }> {
+	private async parseResponseBody(
+		response: Response,
+	): Promise<{ body?: any; body_raw?: string; streaming_details?: StreamingDetails }> {
 		const contentType = response.headers.get("content-type") || "";
 
 		try {
@@ -143,8 +147,7 @@ export class ClaudeTrafficLogger {
 				const body = await response.json();
 				return { body };
 			} else if (contentType.includes("text/event-stream")) {
-				const body_raw = await response.text();
-				return { body_raw };
+				return await this.handleStreamingResponse(response);
 			} else if (contentType.includes("text/")) {
 				const body_raw = await response.text();
 				return { body_raw };
@@ -157,6 +160,211 @@ export class ClaudeTrafficLogger {
 			// Silent error handling during runtime
 			return {};
 		}
+	}
+
+	private async handleStreamingResponse(
+		response: Response,
+	): Promise<{ body_raw: string; streaming_details: StreamingDetails }> {
+		const reader = response.body?.getReader();
+		const decoder = new TextDecoder();
+		let fullContent = "";
+		const chunks: ParsedChunk[] = [];
+		const startTime = Date.now() / 1000;
+
+		if (!reader) {
+			// No reader available, return empty streaming details
+			return {
+				body_raw: "",
+				streaming_details: this.buildStreamingDetails([], startTime),
+			};
+		}
+
+		try {
+			let sequence = 1;
+			while (true) {
+				try {
+					const { done, value } = await reader.read();
+					if (done) break;
+
+					const chunk = decoder.decode(value, { stream: true });
+					fullContent += chunk;
+
+					// Parse and accumulate chunk details (filtering ping events)
+					const parsedChunks = this.parseChunkData(chunk, sequence, startTime);
+					chunks.push(...parsedChunks);
+					sequence += parsedChunks.length;
+				} catch (readError) {
+					// Handle individual read errors
+					const timestamp = Date.now() / 1000;
+					chunks.push({
+						sequence: sequence++,
+						timestamp,
+						event_type: "read_error",
+						data: {
+							error: "Stream read failed",
+							errorMessage: readError instanceof Error ? readError.message : "Unknown read error",
+						},
+						chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+					});
+					break; // Exit on read error
+				}
+			}
+		} catch (streamError) {
+			// Handle overall streaming errors
+			const timestamp = Date.now() / 1000;
+			chunks.push({
+				sequence: 1,
+				timestamp,
+				event_type: "stream_error",
+				data: {
+					error: "Stream processing failed",
+					errorMessage: streamError instanceof Error ? streamError.message : "Unknown stream error",
+				},
+				chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+			});
+		} finally {
+			try {
+				reader.releaseLock();
+			} catch (releaseError) {
+				// Ignore release errors, they're not critical
+			}
+		}
+
+		// Build streaming details
+		const streaming_details = this.buildStreamingDetails(chunks, startTime);
+
+		return { body_raw: fullContent, streaming_details };
+	}
+
+	private isPingEvent(eventData: string): boolean {
+		return eventData.includes('event: ping\ndata: {"type": "ping"}');
+	}
+
+	private parseChunkData(chunkData: string, startSequence: number, startTime: number): ParsedChunk[] {
+		// Split chunk data into individual SSE events
+		const events: ParsedChunk[] = [];
+
+		try {
+			const lines = chunkData.split("\n");
+			let currentEvent: { event?: string; data?: string } = {};
+			let sequence = startSequence;
+
+			for (let i = 0; i < lines.length; i++) {
+				const line = lines[i].trim();
+
+				if (line.startsWith("event: ")) {
+					currentEvent.event = line.replace("event: ", "").trim();
+				} else if (line.startsWith("data: ")) {
+					currentEvent.data = line.replace("data: ", "").trim();
+				} else if (line === "" && currentEvent.event && currentEvent.data) {
+					// End of an SSE event
+					const eventStr = `event: ${currentEvent.event}\ndata: ${currentEvent.data}\n\n`;
+
+					// Filter out ping events
+					if (!this.isPingEvent(eventStr)) {
+						try {
+							const data = JSON.parse(currentEvent.data);
+							const timestamp = Date.now() / 1000;
+
+							events.push({
+								sequence: sequence++,
+								timestamp,
+								event_type: currentEvent.event,
+								data,
+								chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+							});
+						} catch (error) {
+							// Handle malformed JSON gracefully
+							const timestamp = Date.now() / 1000;
+							events.push({
+								sequence: sequence++,
+								timestamp,
+								event_type: currentEvent.event || "unknown",
+								data: {
+									raw: currentEvent.data,
+									error: "Invalid JSON",
+									errorMessage: error instanceof Error ? error.message : "Unknown error",
+								},
+								chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+							});
+						}
+					}
+
+					currentEvent = {};
+				}
+			}
+
+			// Handle incomplete event at end of chunk
+			if (currentEvent.event && currentEvent.data) {
+				const eventStr = `event: ${currentEvent.event}\ndata: ${currentEvent.data}\n\n`;
+				if (!this.isPingEvent(eventStr)) {
+					try {
+						const data = JSON.parse(currentEvent.data);
+						const timestamp = Date.now() / 1000;
+
+						events.push({
+							sequence: sequence++,
+							timestamp,
+							event_type: currentEvent.event,
+							data,
+							chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+						});
+					} catch (error) {
+						const timestamp = Date.now() / 1000;
+						events.push({
+							sequence: sequence++,
+							timestamp,
+							event_type: currentEvent.event || "unknown",
+							data: {
+								raw: currentEvent.data,
+								error: "Invalid JSON",
+								errorMessage: error instanceof Error ? error.message : "Unknown error",
+							},
+							chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+						});
+					}
+				}
+			}
+		} catch (error) {
+			// If parsing completely fails, create an error event
+			const timestamp = Date.now() / 1000;
+			events.push({
+				sequence: startSequence,
+				timestamp,
+				event_type: "parse_error",
+				data: {
+					raw: chunkData,
+					error: "Chunk parsing failed",
+					errorMessage: error instanceof Error ? error.message : "Unknown error",
+				},
+				chunk_timing_ms: Math.round((timestamp - startTime) * 1000),
+			});
+		}
+
+		return events;
+	}
+
+	private buildStreamingDetails(chunks: ParsedChunk[], startTime: number): StreamingDetails {
+		if (chunks.length === 0) {
+			return {
+				chunk_count: 0,
+				first_chunk_timestamp: startTime,
+				last_chunk_timestamp: startTime,
+				total_duration_ms: 0,
+				chunks: [],
+			};
+		}
+
+		const firstTimestamp = chunks[0].timestamp;
+		const lastTimestamp = chunks[chunks.length - 1].timestamp;
+
+		return {
+			chunk_count: chunks.length,
+			first_chunk_timestamp: firstTimestamp,
+			last_chunk_timestamp: lastTimestamp,
+			total_duration_ms: Math.round((lastTimestamp - firstTimestamp) * 1000),
+			chunks,
+		};
 	}
 
 	public instrumentAll(): void {
@@ -387,12 +595,16 @@ export class ClaudeTrafficLogger {
 	private async parseResponseBodyFromString(
 		body: string,
 		contentType?: string,
-	): Promise<{ body?: any; body_raw?: string }> {
+	): Promise<{ body?: any; body_raw?: string; streaming_details?: StreamingDetails }> {
 		try {
 			if (contentType && contentType.includes("application/json")) {
 				return { body: JSON.parse(body) };
 			} else if (contentType && contentType.includes("text/event-stream")) {
-				return { body_raw: body };
+				// For Node.js HTTP streaming, parse the complete body as if it were streaming chunks
+				const startTime = Date.now() / 1000;
+				const parsedChunks = this.parseChunkData(body, 1, startTime);
+				const streaming_details = this.buildStreamingDetails(parsedChunks, startTime);
+				return { body_raw: body, streaming_details };
 			} else {
 				return { body_raw: body };
 			}
@@ -401,9 +613,25 @@ export class ClaudeTrafficLogger {
 		}
 	}
 
+	private rotateLogFile(): void {
+		const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "-").slice(0, -5);
+		this.logFile = path.join(this.logDir, `log-${timestamp}.jsonl`);
+		this.htmlFile = path.join(this.logDir, `log-${timestamp}.html`);
+		fs.writeFileSync(this.logFile, "");
+	}
+
 	private async writePairToLog(pair: RawPair): Promise<void> {
 		try {
 			const jsonLine = JSON.stringify(pair) + "\n";
+
+			// Check file size before writing
+			if (fs.existsSync(this.logFile)) {
+				const stats = fs.statSync(this.logFile);
+				if (stats.size >= this.config.maxLogSize!) {
+					this.rotateLogFile();
+				}
+			}
+
 			fs.appendFileSync(this.logFile, jsonLine);
 		} catch (error) {
 			// Silent error handling during runtime

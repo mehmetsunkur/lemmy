@@ -15,6 +15,7 @@ export interface RawPair {
 		body?: any;
 		body_raw?: string;
 		events?: SSEEvent[];
+		streaming_details?: StreamingDetails;
 	} | null; // null for orphaned requests
 	logged_at: string;
 	note?: string; // For orphaned requests
@@ -24,6 +25,23 @@ export interface SSEEvent {
 	event: string;
 	data: any;
 	timestamp: string;
+}
+
+// New interfaces for real-time streaming metadata
+export interface ParsedChunk {
+	sequence: number;
+	timestamp: number;
+	event_type: string;
+	data: any;
+	chunk_timing_ms: number;
+}
+
+export interface StreamingDetails {
+	chunk_count: number;
+	first_chunk_timestamp: number;
+	last_chunk_timestamp: number;
+	total_duration_ms: number;
+	chunks: ParsedChunk[];
 }
 
 export interface ClaudeData {

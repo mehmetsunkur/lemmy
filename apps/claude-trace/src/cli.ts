@@ -227,7 +227,13 @@ async function runClaudeWithInterception(
 	const claudePath = getClaudeAbsolutePath();
 	const loaderPath = getLoaderPath();
 
-	log("Starting traffic logger...", "green");
+	log("🔄 Starting traffic logger...", "green");
+	if (!noZeroLatency) {
+		log("⚡ Zero-latency mode enabled (< 0.1ms overhead)", "yellow");
+	} else {
+		log("📊 Standard mode enabled (zero-latency disabled)", "yellow");
+	}
+	log("📁 Logs will be written to: .claude-trace/log-YYYY-MM-DD-HH-MM-SS.{jsonl,html}", "blue");
 	console.log("");
 
 	// Launch node with interceptor and absolute path to claude, plus any additional arguments

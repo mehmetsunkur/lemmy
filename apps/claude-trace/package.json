@@ -1,6 +1,6 @@
 {
 	"name": "@mariozechner/claude-trace",
-	"version": "1.0.3",
+	"version": "1.1.0",
 	"description": "Record all your interactions with Claude Code as you develop your projects",
 	"main": "dist/index.js",
 	"bin": {
@@ -17,6 +17,9 @@
 		"prepublishOnly": "npm run clean && npm run build",
 		"test": "node --require ./dist/interceptor.js echo 'test'",
 		"test:generate": "npx tsx src/cli test/test-traffic.jsonl test/index.html",
+		"test:zero-latency": "npx tsx src/test/zero-latency.test.ts",
+		"benchmark": "npx tsx src/benchmark/performance-benchmark.ts",
+		"example:zero-latency": "npx tsx examples/zero-latency-usage.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"files": [

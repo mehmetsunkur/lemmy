@@ -3,12 +3,21 @@ import path from "path";
 import { spawn } from "child_process";
 import { RawPair, StreamingDetails, ParsedChunk } from "./types";
 import { HTMLGenerator } from "./html-generator";
+import { ZeroLatencyInterceptor } from "./zero-latency-interceptor";
 
 export interface InterceptorConfig {
 	logDirectory?: string;
 	enableRealTimeHTML?: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error";
 	maxLogSize?: number; // bytes, default 3MB
+	zeroLatency?: {
+		enabled: boolean;
+		backgroundWorkers?: number;
+		writeBufferSize?: number;
+		writeBufferFlushMs?: number;
+		deferredParsing?: boolean;
+		memoryPoolSize?: number;
+	};
 }
 
 export class ClaudeTrafficLogger {
@@ -19,6 +28,7 @@ export class ClaudeTrafficLogger {
 	private pairs: RawPair[] = [];
 	private config: InterceptorConfig;
 	private htmlGenerator: HTMLGenerator;
+	private zeroLatencyInterceptor?: ZeroLatencyInterceptor;
 
 	constructor(config: InterceptorConfig = {}) {
 		this.config = {
@@ -43,6 +53,11 @@ export class ClaudeTrafficLogger {
 
 		// Initialize HTML generator
 		this.htmlGenerator = new HTMLGenerator();
+
+		// Initialize zero-latency interceptor if enabled
+		if (this.config.zeroLatency?.enabled) {
+			this.zeroLatencyInterceptor = new ZeroLatencyInterceptor(this.logFile, this.config.zeroLatency);
+		}
 
 		// Clear log file
 		fs.writeFileSync(this.logFile, "");
@@ -132,7 +147,9 @@ export class ClaudeTrafficLogger {
 				const body = await response.json();
 				return { body };
 			} else if (contentType.includes("text/event-stream")) {
-				return await this.handleStreamingResponse(response);
+				// For JSONL logging, only return body_raw to avoid duplication
+				const streamingResult = await this.handleStreamingResponse(response);
+				return { body_raw: streamingResult.body_raw };
 			} else if (contentType.includes("text/")) {
 				const body_raw = await response.text();
 				return { body_raw };
@@ -400,6 +417,26 @@ export class ClaudeTrafficLogger {
 				const response = await originalFetch(input, init);
 				const responseTimestamp = Date.now();
 
+				// Use zero-latency interceptor if enabled
+				if (logger.zeroLatencyInterceptor) {
+					const isStreaming = response.headers.get("content-type")?.includes("text/event-stream");
+
+					if (isStreaming) {
+						return await logger.zeroLatencyInterceptor.interceptStreamingResponse(
+							response,
+							requestData,
+							requestId,
+						);
+					} else {
+						return await logger.zeroLatencyInterceptor.interceptNonStreamingResponse(
+							response,
+							requestData,
+							requestId,
+						);
+					}
+				}
+
+				// Fallback to standard processing
 				// Clone response to avoid consuming the body
 				const clonedResponse = await logger.cloneResponse(response);
 
@@ -501,7 +538,6 @@ export class ClaudeTrafficLogger {
 			return originalRequest.call(this, options, callback);
 		}
 
-		const requestId = this.generateRequestId();
 		const requestTimestamp = Date.now();
 		let requestBody = "";
 
@@ -637,8 +673,14 @@ export class ClaudeTrafficLogger {
 		}
 	}
 
-	public cleanup(): void {
+	public async cleanup(): Promise<void> {
 		console.log("Cleaning up orphaned requests...");
+
+		// Clean up zero-latency interceptor if enabled
+		if (this.zeroLatencyInterceptor) {
+			await this.zeroLatencyInterceptor.waitForCompletion();
+			await this.zeroLatencyInterceptor.destroy();
+		}
 
 		for (const [, requestData] of this.pendingRequests.entries()) {
 			const orphanedPair = {
@@ -672,12 +714,36 @@ export class ClaudeTrafficLogger {
 	}
 
 	public getStats() {
-		return {
+		const basicStats = {
 			totalPairs: this.pairs.length,
 			pendingRequests: this.pendingRequests.size,
 			logFile: this.logFile,
 			htmlFile: this.htmlFile,
 		};
+
+		// Add zero-latency stats if enabled
+		if (this.zeroLatencyInterceptor) {
+			return {
+				...basicStats,
+				zeroLatency: {
+					enabled: true,
+					performance: this.zeroLatencyInterceptor.getPerformanceMetrics(),
+					processor: this.zeroLatencyInterceptor.getProcessorMetrics(),
+					meetsTarget: this.zeroLatencyInterceptor.meetsZeroLatencyTarget(),
+					queueSize: this.zeroLatencyInterceptor.getQueueSize(),
+					bufferUtilization: this.zeroLatencyInterceptor.getBufferUtilization(),
+				},
+			};
+		}
+
+		return { ...basicStats, zeroLatency: { enabled: false } };
+	}
+
+	public getZeroLatencyReport(): string | null {
+		if (!this.zeroLatencyInterceptor) {
+			return null;
+		}
+		return this.zeroLatencyInterceptor.generatePerformanceReport();
 	}
 }
 
@@ -698,18 +764,32 @@ export function initializeInterceptor(config?: InterceptorConfig): ClaudeTraffic
 
 	// Setup cleanup on process exit only once
 	if (!eventListenersSetup) {
-		const cleanup = () => {
+		const cleanup = async () => {
 			if (globalLogger) {
-				globalLogger.cleanup();
+				await globalLogger.cleanup();
 			}
 		};
 
-		process.on("exit", cleanup);
-		process.on("SIGINT", cleanup);
-		process.on("SIGTERM", cleanup);
-		process.on("uncaughtException", (error) => {
+		process.on("exit", () => {
+			// For exit event, we can't await, so we just call cleanup
+			if (globalLogger) {
+				globalLogger.cleanup().catch(console.error);
+			}
+		});
+
+		process.on("SIGINT", async () => {
+			await cleanup();
+			process.exit(0);
+		});
+
+		process.on("SIGTERM", async () => {
+			await cleanup();
+			process.exit(0);
+		});
+
+		process.on("uncaughtException", async (error) => {
 			console.error("Uncaught exception:", error);
-			cleanup();
+			await cleanup();
 			process.exit(1);
 		});
 

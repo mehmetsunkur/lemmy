@@ -15,7 +15,7 @@ export interface RawPair {
 		body?: any;
 		body_raw?: string;
 		events?: SSEEvent[];
-		streaming_details?: StreamingDetails;
+		streaming_details?: StreamingDetails; // Note: Not included in JSONL output to avoid duplication with body_raw
 	} | null; // null for orphaned requests
 	logged_at: string;
 	note?: string; // For orphaned requests
@@ -48,6 +48,41 @@ export interface ClaudeData {
 	rawPairs: RawPair[];
 	timestamp?: string;
 	metadata?: Record<string, any>;
+}
+
+// Zero-latency interceptor types
+export interface ZeroLatencyConfig {
+	enabled: boolean;
+	backgroundWorkers?: number;
+	writeBufferSize?: number;
+	writeBufferFlushMs?: number;
+	deferredParsing?: boolean;
+	memoryPoolSize?: number;
+}
+
+export interface ProcessingTask {
+	stream: ReadableStream<Uint8Array>;
+	timestamp: number;
+	requestId: string;
+	requestData: any;
+	responseMetadata: any;
+}
+
+export interface LogEntry {
+	requestId: string;
+	timestamp: number;
+	rawChunks: Buffer[];
+	requestData: any;
+	responseMetadata: any;
+	parsed?: boolean;
+}
+
+export interface PerformanceMetrics {
+	interceptorLatency: number;
+	totalRequests: number;
+	backgroundQueueSize: number;
+	memoryUsage: number;
+	lastMeasurement: number;
 }
 
 // Internal types for HTML generation

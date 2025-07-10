@@ -34,6 +34,7 @@ ${colors.yellow}OPTIONS:${colors.reset}
   --index           Generate conversation summaries and index for .claude-trace/ directory
   --run-with         Pass all following arguments to Claude process
   --include-all-requests Include all requests made through fetch, otherwise only requests to v1/messages with more than 2 messages in the context
+  --no-zero-latency  Disable zero-latency mode (enabled by default for optimal performance)
   --no-open          Don't open generated HTML file in browser (works with --generate-html)
   --help, -h         Show this help message
 
@@ -56,7 +57,7 @@ ${colors.yellow}MODES:${colors.reset}
     claude-trace --index                             Generate conversation summaries and index
 
 ${colors.yellow}EXAMPLES:${colors.reset}
-  # Start Claude with logging
+  # Start Claude with logging (zero-latency enabled by default)
   claude-trace
 
   # Run Claude chat with logging
@@ -67,6 +68,9 @@ ${colors.yellow}EXAMPLES:${colors.reset}
 
   # Pass multiple arguments to Claude
   claude-trace --run-with --model gpt-4o --temperature 0.7
+
+  # Disable zero-latency mode for compatibility
+  claude-trace --no-zero-latency
 
   # Extract token for Anthropic SDK
   export ANTHROPIC_API_KEY=$(claude-trace --extract-token)
@@ -132,6 +136,7 @@ async function runClaudeWithInterception(
 	claudeArgs: string[] = [],
 	includeAllRequests: boolean = false,
 	openInBrowser: boolean = false,
+	noZeroLatency: boolean = false,
 ): Promise<void> {
 	log("🚀 Claude Trace", "blue");
 	log("Starting Claude with traffic logging", "yellow");
@@ -144,6 +149,11 @@ async function runClaudeWithInterception(
 	const loaderPath = getLoaderPath();
 
 	log("🔄 Starting traffic logger...", "green");
+	if (!noZeroLatency) {
+		log("⚡ Zero-latency mode enabled (< 0.1ms overhead)", "yellow");
+	} else {
+		log("📊 Standard mode enabled (zero-latency disabled)", "yellow");
+	}
 	log("📁 Logs will be written to: .claude-trace/log-YYYY-MM-DD-HH-MM-SS.{jsonl,html}", "blue");
 	console.log("");
 
@@ -155,6 +165,7 @@ async function runClaudeWithInterception(
 			NODE_OPTIONS: "--no-deprecation",
 			CLAUDE_TRACE_INCLUDE_ALL_REQUESTS: includeAllRequests ? "true" : "false",
 			CLAUDE_TRACE_OPEN_BROWSER: openInBrowser ? "true" : "false",
+			CLAUDE_TRACE_ZERO_LATENCY: noZeroLatency ? "false" : "true",
 		},
 		stdio: "inherit",
 		cwd: process.cwd(),
@@ -364,6 +375,9 @@ async function main(): Promise<void> {
 	// Check for include all requests flag
 	const includeAllRequests = claudeTraceArgs.includes("--include-all-requests");
 
+	// Check for no-zero-latency flag (inverted logic - zero-latency enabled by default)
+	const noZeroLatency = claudeTraceArgs.includes("--no-zero-latency");
+
 	// Check for no-open flag (inverted logic - open by default)
 	const openInBrowser = !claudeTraceArgs.includes("--no-open");
 
@@ -405,7 +419,7 @@ async function main(): Promise<void> {
 	}
 
 	// Scenario 1: No args (or claude with args) -> launch claude with interception
-	await runClaudeWithInterception(claudeArgs, includeAllRequests, openInBrowser);
+	await runClaudeWithInterception(claudeArgs, includeAllRequests, openInBrowser, noZeroLatency);
 }
 
 main().catch((error) => {

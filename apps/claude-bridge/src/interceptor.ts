@@ -241,10 +241,10 @@ export class ClaudeBridgeInterceptor {
 				askOptions.maxOutputTokens = validation.adjustments.maxOutputTokens;
 			}
 
-			// Apply maxCompletionTokens for OpenAI provider if specified
-			if (this.clientInfo.provider === "openai" && this.config.maxCompletionTokens) {
-				(askOptions as OpenAIAskOptions).maxCompletionTokens = this.config.maxCompletionTokens;
-				this.logger.log(`Setting maxCompletionTokens for OpenAI: ${this.config.maxCompletionTokens}`);
+			// Apply maxOutputTokens override from config if specified
+			if (this.config.maxOutputTokens) {
+				askOptions.maxOutputTokens = this.config.maxOutputTokens;
+				this.logger.log(`Overriding maxOutputTokens with config value: ${this.config.maxOutputTokens}`);
 			}
 
 			this.logger.log(`Calling ${this.clientInfo.provider} with model: ${this.clientInfo.model}`);

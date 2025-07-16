@@ -98,19 +98,79 @@ For more information, visit: https://github.com/mariozechner/claude-trace
 `);
 }
 
+function resolveToJsFile(filePath: string): string {
+	try {
+		// First, resolve any symlinks
+		const realPath = fs.realpathSync(filePath);
+		
+		// Check if it's already a JS file
+		if (realPath.endsWith('.js')) {
+			return realPath;
+		}
+		
+		// If it's a Node.js shebang script, check if it's actually a JS file
+		if (fs.existsSync(realPath)) {
+			const content = fs.readFileSync(realPath, 'utf-8');
+			// Check for Node.js shebang
+			if (content.startsWith('#!/usr/bin/env node') || 
+				content.match(/^#!.*\/node$/m) ||
+				content.includes('require(') ||
+				content.includes('import ')) {
+				// This is likely a JS file without .js extension
+				return realPath;
+			}
+		}
+		
+		// If not a JS file, try common JS file locations
+		const possibleJsPaths = [
+			realPath + '.js',
+			realPath.replace(/\/bin\//, '/lib/') + '.js',
+			realPath.replace(/\/\.bin\//, '/lib/bin/') + '.js'
+		];
+		
+		for (const jsPath of possibleJsPaths) {
+			if (fs.existsSync(jsPath)) {
+				return jsPath;
+			}
+		}
+		
+		// Fall back to original path
+		return realPath;
+	} catch (error) {
+		// If resolution fails, return original path
+		return filePath;
+	}
+}
+
 function getClaudeAbsolutePath(): string {
 	try {
-		return require("child_process")
+		const claudePath = require("child_process")
 			.execSync("which claude", {
 				encoding: "utf-8",
 			})
 			.trim();
+		
+		// Check if the path is a bash wrapper
+		if (fs.existsSync(claudePath)) {
+			const content = fs.readFileSync(claudePath, 'utf-8');
+			if (content.startsWith('#!/bin/bash')) {
+				// Parse bash wrapper to find actual executable
+				const execMatch = content.match(/exec\s+"([^"]+)"/);
+				if (execMatch && execMatch[1]) {
+					const actualPath = execMatch[1];
+					// Resolve any symlinks to get the final JS file
+					return resolveToJsFile(actualPath);
+				}
+			}
+		}
+		
+		return claudePath;
 	} catch (error) {
 		const os = require("os");
 		const localClaudePath = path.join(os.homedir(), ".claude", "local", "node_modules", ".bin", "claude");
 
 		if (fs.existsSync(localClaudePath)) {
-			return localClaudePath;
+			return resolveToJsFile(localClaudePath);
 		}
 
 		log(`❌ Claude CLI not found in PATH`, "red");

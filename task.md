@@ -1,6 +1,6 @@
 # Issue #21: getClaudeAbsolutePath finds bash file, not js file
 **Status:** InProgress
-**Agent PID:** 4085
+**Agent PID:** 8307
 
 ## Original Todo
 - Issue #21: getClaudeAbsolutePath finds bash file, not js file
@@ -21,9 +21,9 @@ The implementation plan will:
 4. Add tests to verify the fix works with both direct executables and bash wrappers
 5. Ensure backward compatibility with existing Claude installations
 
-- [ ] Update getClaudeAbsolutePath function to detect and handle bash wrappers (apps/claude-trace/src/cli.ts:97-117)
-- [ ] Add helper function to parse bash wrapper and extract exec command
-- [ ] Add helper function to resolve symbolic links to final JS file
+- [x] Update getClaudeAbsolutePath function to detect and handle bash wrappers (apps/claude-trace/src/cli.ts:97-117)
+- [x] Add helper function to parse bash wrapper and extract exec command
+- [x] Add helper function to resolve symbolic links to final JS file
 - [ ] Add unit tests for the updated function
 - [ ] User test: Install Claude via /migrate and verify claude-trace works
 

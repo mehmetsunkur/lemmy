@@ -33,10 +33,10 @@ try {
 		const { initializeInterceptor } = require("./interceptor.ts");
 		initializeInterceptor(config);
 	} else {
-		console.error("❌ Could not find interceptor file");
+		console.error("Could not find interceptor file");
 		process.exit(1);
 	}
 } catch (error) {
-	console.error("❌ Error loading interceptor:", error.message);
+	console.error("Error loading interceptor:", error.message);
 	process.exit(1);
 }

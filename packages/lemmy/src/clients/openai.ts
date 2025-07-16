@@ -43,7 +43,7 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 	private buildOpenAIParams(
 		options: AskOptions<OpenAIAskOptions> & StreamingCallbacks,
 		messages: OpenAI.Chat.ChatCompletionMessageParam[],
-	): OpenAI.Chat.ChatCompletionCreateParams {
+	): OpenAI.Chat.ChatCompletionCreateParams & { signal?: AbortSignal } {
 		const params: OpenAI.Chat.ChatCompletionCreateParams = {
 			model: this.config.model,
 			stream: true,
@@ -84,7 +84,14 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 			params.tools = openaiTools;
 			params.tool_choice = options.toolChoice || "auto";
 		}
-		return params;
+
+		// Add abort signal if provided
+		const result: OpenAI.Chat.ChatCompletionCreateParams & { signal?: AbortSignal } = params;
+		if (options.abortSignal) {
+			result.signal = options.abortSignal;
+		}
+
+		return result;
 	}
 
 	async ask(
@@ -93,6 +100,16 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 	): Promise<AskResult> {
 		const startTime = performance.now();
 		try {
+			// Check if request was already aborted
+			if (options?.abortSignal?.aborted) {
+				const modelError: ModelError = {
+					type: "invalid_request",
+					message: "Request was aborted",
+					retryable: false,
+				};
+				return { type: "error", error: modelError };
+			}
+
 			// Convert input to AskInput format
 			const userInput: AskInput = typeof input === "string" ? { content: input } : input;
 
@@ -125,6 +142,16 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 			// Build request parameters
 			const mergedOptions = { ...this.config.defaults, ...options };
 			const requestParams = this.buildOpenAIParams(mergedOptions, messages);
+
+			// Check abort signal before making request
+			if (options?.abortSignal?.aborted) {
+				const modelError: ModelError = {
+					type: "invalid_request",
+					message: "Request was aborted",
+					retryable: false,
+				};
+				return { type: "error", error: modelError };
+			}
 
 			// Execute streaming request
 			const stream = await this.openai.chat.completions.create(requestParams);
@@ -232,6 +259,16 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 
 		try {
 			for await (const chunk of stream) {
+				// Check abort signal during streaming
+				if (options?.abortSignal?.aborted) {
+					const modelError: ModelError = {
+						type: "invalid_request",
+						message: "Request was aborted during streaming",
+						retryable: false,
+					};
+					return { type: "error", error: modelError };
+				}
+
 				// Handle usage information (comes in final chunk with stream_options)
 				if (chunk.usage) {
 					inputTokens = chunk.usage.prompt_tokens || 0;
@@ -371,6 +408,16 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 	}
 
 	private handleError(error: unknown): AskResult {
+		// Handle abort errors specifically
+		if (error instanceof DOMException && error.name === "AbortError") {
+			const modelError: ModelError = {
+				type: "invalid_request",
+				message: "Request was aborted",
+				retryable: false,
+			};
+			return { type: "error", error: modelError };
+		}
+
 		// Convert various error types to ModelError
 		if (error instanceof Error && "status" in error) {
 			const apiError = error as Error & { status: number; headers?: Record<string, string> };

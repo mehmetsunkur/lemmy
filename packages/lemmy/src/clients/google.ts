@@ -109,6 +109,16 @@ export class GoogleClient implements ChatClient<GoogleAskOptions> {
 	): Promise<AskResult> {
 		const startTime = performance.now();
 		try {
+			// Check if request was already aborted
+			if (options?.abortSignal?.aborted) {
+				const modelError: ModelError = {
+					type: "invalid_request",
+					message: "Request was aborted",
+					retryable: false,
+				};
+				return { type: "error", error: modelError };
+			}
+
 			// Convert input to AskInput format
 			const userInput: AskInput = typeof input === "string" ? { content: input } : input;
 

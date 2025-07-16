@@ -1,6 +1,6 @@
 # Fix log file output message
 **Status:** InProgress
-**Agent PID:** 16973
+**Agent PID:** 20146
 
 ## Original Todo
 "📁 Logs will be written to: .claude-trace/log-YYYY-MM-DD-HH-MM-SS.{jsonl,html}" this is terrible. Just state both files verbatim, so a user can click on them. Also we need to remove all emojis from the logs.
@@ -15,8 +15,8 @@ The claude-trace app currently displays a generic log file message with placehol
 
 Here's the detailed plan:
 
-- [ ] Update interceptor.ts to expose the actual log filenames (apps/claude-trace/src/interceptor.ts:37-40)
-- [ ] Modify cli.ts to display the actual filenames instead of placeholder pattern (apps/claude-trace/src/cli.ts:226)
+- [x] Update interceptor.ts to expose the actual log filenames (apps/claude-trace/src/interceptor.ts:37-40)
+- [x] Modify cli.ts to display the actual filenames instead of placeholder pattern (apps/claude-trace/src/cli.ts:226)
 - [ ] Remove all emojis from console output in cli.ts (multiple locations)
 - [ ] Remove all emojis from console output in index-generator.ts (multiple locations)
 - [ ] Remove emojis from interceptor.ts console output (apps/claude-trace/src/interceptor.ts:443,445)

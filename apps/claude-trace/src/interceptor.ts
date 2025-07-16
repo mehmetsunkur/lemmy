@@ -61,6 +61,11 @@ export class ClaudeTrafficLogger {
 
 		// Clear log file
 		fs.writeFileSync(this.logFile, "");
+
+		// Output the actual filenames
+		console.log(`Logs will be written to:`);
+		console.log(`  JSONL: ${this.logFile}`);
+		console.log(`  HTML:  ${this.htmlFile}`);
 	}
 
 	private isAnthropicAPI(url: string | URL): boolean {

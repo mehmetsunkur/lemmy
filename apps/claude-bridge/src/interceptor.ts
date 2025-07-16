@@ -428,21 +428,18 @@ export async function initializeInterceptor(config?: BridgeConfig): Promise<Clau
 		return globalInterceptor;
 	}
 
-	const defaultConfig: BridgeConfig = {
-		provider: (process.env["CLAUDE_BRIDGE_PROVIDER"] as Provider) || "openai",
-		model: process.env["CLAUDE_BRIDGE_MODEL"] || "gpt-4o",
-		apiKey: process.env["CLAUDE_BRIDGE_API_KEY"],
-		baseURL: process.env["CLAUDE_BRIDGE_BASE_URL"],
-		maxRetries: process.env["CLAUDE_BRIDGE_MAX_RETRIES"]
-			? parseInt(process.env["CLAUDE_BRIDGE_MAX_RETRIES"])
-			: undefined,
-		maxCompletionTokens: process.env["CLAUDE_BRIDGE_MAX_COMPLETION_TOKENS"]
-			? parseInt(process.env["CLAUDE_BRIDGE_MAX_COMPLETION_TOKENS"])
-			: undefined,
-		logDirectory: process.env["CLAUDE_BRIDGE_LOG_DIR"] || ".claude-bridge",
-		debug: process.env["CLAUDE_BRIDGE_DEBUG"] === "true",
-		trace: process.env["CLAUDE_BRIDGE_TRACE"] === "true",
-	};
+	// Parse BridgeConfig from JSON environment variable
+	if (!process.env["CLAUDE_BRIDGE_CONFIG"]) {
+		throw new Error("CLAUDE_BRIDGE_CONFIG environment variable not set");
+	}
+	
+	let defaultConfig: BridgeConfig;
+	try {
+		defaultConfig = JSON.parse(process.env["CLAUDE_BRIDGE_CONFIG"]);
+	} catch (error) {
+		console.error("❌ Failed to parse CLAUDE_BRIDGE_CONFIG:", error);
+		throw new Error("Invalid CLAUDE_BRIDGE_CONFIG JSON");
+	}
 
 	globalInterceptor = await ClaudeBridgeInterceptor.create({ ...defaultConfig, ...config });
 	globalInterceptor.instrumentFetch();

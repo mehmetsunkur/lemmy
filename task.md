@@ -1,5 +1,5 @@
 # Issue #21: getClaudeAbsolutePath finds bash file, not js file
-**Status:** InProgress
+**Status:** AwaitingCommit
 **Agent PID:** 8307
 
 ## Original Todo
@@ -24,7 +24,7 @@ The implementation plan will:
 - [x] Update getClaudeAbsolutePath function to detect and handle bash wrappers (apps/claude-trace/src/cli.ts:97-117)
 - [x] Add helper function to parse bash wrapper and extract exec command
 - [x] Add helper function to resolve symbolic links to final JS file
-- [ ] User test: Install Claude via /migrate and verify claude-trace works
+- [x] User test: Install Claude via /migrate and verify claude-trace works
 
 ## Notes
 The issue occurs because Node.js cannot directly execute bash scripts when spawned with `node --require loader.js bash-script`. We need to extract the actual JS file path from the bash wrapper.

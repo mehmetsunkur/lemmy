@@ -1,5 +1,5 @@
 # Max completion tokens CLI flag
-**Status:** InProgress
+**Status:** AwaitingCommit
 **Agent PID:** 46914
 
 ## Original Todo
@@ -52,7 +52,7 @@ Add a `--max-output-tokens` CLI flag to claude-bridge that allows users to overr
 - [x] Update interceptor to parse BridgeConfig from CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/interceptor.ts
 - [x] Apply maxOutputTokens override in callProvider method in apps/claude-bridge/src/interceptor.ts:237
 - [x] Add validation that max-output-tokens is a positive integer
-- [ ] Test with the problematic model from the todo example
+- [x] Test with the problematic model from the todo example
 
 ## Notes
 - Using a single CLAUDE_BRIDGE_CONFIG env var with JSON serialization for cleaner config passing

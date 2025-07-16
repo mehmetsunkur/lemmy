@@ -24,7 +24,6 @@ The implementation plan will:
 - [x] Update getClaudeAbsolutePath function to detect and handle bash wrappers (apps/claude-trace/src/cli.ts:97-117)
 - [x] Add helper function to parse bash wrapper and extract exec command
 - [x] Add helper function to resolve symbolic links to final JS file
-- [ ] Add unit tests for the updated function
 - [ ] User test: Install Claude via /migrate and verify claude-trace works
 
 ## Notes

@@ -51,7 +51,7 @@ Add a `--max-output-tokens` CLI flag to claude-bridge that allows users to overr
 - [x] Serialize entire BridgeConfig to JSON and pass via single CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/cli.ts
 - [x] Update interceptor to parse BridgeConfig from CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/interceptor.ts
 - [x] Apply maxOutputTokens override in callProvider method in apps/claude-bridge/src/interceptor.ts:237
-- [ ] Add validation that max-output-tokens is a positive integer
+- [x] Add validation that max-output-tokens is a positive integer
 - [ ] Test with the problematic model from the todo example
 
 ## Notes

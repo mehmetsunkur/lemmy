@@ -1,5 +1,5 @@
 # Max completion tokens CLI flag
-**Status:** Refining
+**Status:** InProgress
 **Agent PID:** 40175
 
 ## Original Todo
@@ -43,13 +43,18 @@ apps/claude-bridge we need a way to set max_completion_tokens as a cli flag and 
   ```
 
 ## Description
-[what we're building]
+Add a `--max-output-tokens` CLI flag to claude-bridge that allows users to override the max output tokens for any provider. This maps to `maxOutputTokens` in the BaseAskOptions, which OpenAI's client then converts to `max_completion_tokens`. This is needed because some models (especially those not in the registry) have stricter token limits than what Claude Code requests by default, causing API errors.
 
 ## Implementation Plan
-[how we are building it]
-- [ ] Code change with location(s) if applicable (src/file.ts:45-93)
-- [ ] Automated test: ...
-- [ ] User test: ...
+- [ ] Add `--max-output-tokens` CLI flag parsing in apps/claude-bridge/src/cli.ts
+- [ ] Add `maxOutputTokens?: number` to BridgeConfig interface in apps/claude-bridge/src/types.ts
+- [ ] Serialize entire BridgeConfig to JSON and pass via single CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/cli.ts
+- [ ] Update interceptor to parse BridgeConfig from CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/interceptor.ts
+- [ ] Apply maxOutputTokens override in callProvider method in apps/claude-bridge/src/interceptor.ts:237
+- [ ] Add validation that max-output-tokens is a positive integer
+- [ ] Test with the problematic model from the todo example
 
 ## Notes
-[Implementation notes]
+- Using a single CLAUDE_BRIDGE_CONFIG env var with JSON serialization for cleaner config passing
+- The maxOutputTokens applies to all providers (not just OpenAI) as it's in BaseAskOptions
+- OpenAI client automatically converts maxOutputTokens to max_completion_tokens

@@ -49,6 +49,7 @@ export interface BridgeConfig {
 	apiKey?: string | undefined;
 	baseURL?: string | undefined;
 	maxRetries?: number | undefined;
+	maxCompletionTokens?: number | undefined;
 	logDirectory?: string | undefined;
 	logLevel?: "debug" | "info" | "warn" | "error" | undefined;
 	debug?: boolean | undefined;

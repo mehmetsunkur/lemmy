@@ -23,6 +23,7 @@ import {
 	type ToolResult,
 	type Attachment,
 	AskInput,
+	type OpenAIAskOptions,
 } from "@mariozechner/lemmy";
 import { lemmy } from "@mariozechner/lemmy";
 import { z } from "zod";
@@ -240,6 +241,12 @@ export class ClaudeBridgeInterceptor {
 				askOptions.maxOutputTokens = validation.adjustments.maxOutputTokens;
 			}
 
+			// Apply maxCompletionTokens for OpenAI provider if specified
+			if (this.clientInfo.provider === "openai" && this.config.maxCompletionTokens) {
+				(askOptions as OpenAIAskOptions).maxCompletionTokens = this.config.maxCompletionTokens;
+				this.logger.log(`Setting maxCompletionTokens for OpenAI: ${this.config.maxCompletionTokens}`);
+			}
+
 			this.logger.log(`Calling ${this.clientInfo.provider} with model: ${this.clientInfo.model}`);
 			const askResult: AskResult = await this.clientInfo.client.ask(askInput, { context, ...askOptions });
 
@@ -428,6 +435,9 @@ export async function initializeInterceptor(config?: BridgeConfig): Promise<Clau
 		baseURL: process.env["CLAUDE_BRIDGE_BASE_URL"],
 		maxRetries: process.env["CLAUDE_BRIDGE_MAX_RETRIES"]
 			? parseInt(process.env["CLAUDE_BRIDGE_MAX_RETRIES"])
+			: undefined,
+		maxCompletionTokens: process.env["CLAUDE_BRIDGE_MAX_COMPLETION_TOKENS"]
+			? parseInt(process.env["CLAUDE_BRIDGE_MAX_COMPLETION_TOKENS"])
 			: undefined,
 		logDirectory: process.env["CLAUDE_BRIDGE_LOG_DIR"] || ".claude-bridge",
 		debug: process.env["CLAUDE_BRIDGE_DEBUG"] === "true",

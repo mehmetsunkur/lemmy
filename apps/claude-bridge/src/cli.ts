@@ -27,6 +27,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { patchClaudeBinary } from "./patch-claude.js";
 import { VERSION } from "./version.js";
+import type { BridgeConfig } from "./types.js";
 
 interface ClaudeArgs {
 	provider: Provider;
@@ -585,20 +586,25 @@ function runClaudeWithBridge(args: ClaudeArgs): number {
 	// Clean environment to avoid Claude's anti-debugging checks
 	const cleanEnv = { ...process.env };
 
+	// Create BridgeConfig object
+	const bridgeConfig: BridgeConfig = {
+		provider: args.provider,
+		model: args.model,
+		apiKey,
+		baseURL: args.baseURL,
+		maxRetries: args.maxRetries,
+		maxOutputTokens: args.maxOutputTokens,
+		logDirectory: args.logDir,
+		debug: args.debug,
+		trace: args.trace,
+	};
+
 	const result = spawnSync("node", spawnArgs, {
 		stdio: "inherit",
 		env: {
 			...cleanEnv,
 			NODE_OPTIONS: `${cleanEnv["NODE_OPTIONS"]} --no-deprecation`,
-			CLAUDE_BRIDGE_PROVIDER: args.provider,
-			CLAUDE_BRIDGE_MODEL: args.model,
-			CLAUDE_BRIDGE_API_KEY: apiKey,
-			CLAUDE_BRIDGE_BASE_URL: args.baseURL,
-			CLAUDE_BRIDGE_MAX_RETRIES: args.maxRetries?.toString(),
-			CLAUDE_BRIDGE_MAX_OUTPUT_TOKENS: args.maxOutputTokens?.toString(),
-			CLAUDE_BRIDGE_LOG_DIR: args.logDir,
-			CLAUDE_BRIDGE_DEBUG: args.debug?.toString(),
-			CLAUDE_BRIDGE_TRACE: args.trace?.toString(),
+			CLAUDE_BRIDGE_CONFIG: JSON.stringify(bridgeConfig),
 		},
 	});
 

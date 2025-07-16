@@ -144,11 +144,17 @@ function resolveToJsFile(filePath: string): string {
 
 function getClaudeAbsolutePath(): string {
 	try {
-		const claudePath = require("child_process")
+		let claudePath = require("child_process")
 			.execSync("which claude", {
 				encoding: "utf-8",
 			})
 			.trim();
+		
+		// Handle shell aliases (e.g., "claude: aliased to /path/to/claude")
+		const aliasMatch = claudePath.match(/:\s*aliased to\s+(.+)$/);
+		if (aliasMatch && aliasMatch[1]) {
+			claudePath = aliasMatch[1];
+		}
 		
 		// Check if the path is a bash wrapper
 		if (fs.existsSync(claudePath)) {
@@ -164,17 +170,30 @@ function getClaudeAbsolutePath(): string {
 			}
 		}
 		
-		return claudePath;
+		return resolveToJsFile(claudePath);
 	} catch (error) {
+		// First try the local bash wrapper
 		const os = require("os");
+		const localClaudeWrapper = path.join(os.homedir(), ".claude", "local", "claude");
+		
+		if (fs.existsSync(localClaudeWrapper)) {
+			const content = fs.readFileSync(localClaudeWrapper, 'utf-8');
+			if (content.startsWith('#!/bin/bash')) {
+				const execMatch = content.match(/exec\s+"([^"]+)"/);
+				if (execMatch && execMatch[1]) {
+					return resolveToJsFile(execMatch[1]);
+				}
+			}
+		}
+		
+		// Then try the node_modules/.bin path
 		const localClaudePath = path.join(os.homedir(), ".claude", "local", "node_modules", ".bin", "claude");
-
 		if (fs.existsSync(localClaudePath)) {
 			return resolveToJsFile(localClaudePath);
 		}
 
 		log(`❌ Claude CLI not found in PATH`, "red");
-		log(`❌ Also checked for local installation at: ${localClaudePath}`, "red");
+		log(`❌ Also checked for local installation at: ${localClaudeWrapper}`, "red");
 		log(`❌ Please install Claude Code CLI first`, "red");
 		process.exit(1);
 	}

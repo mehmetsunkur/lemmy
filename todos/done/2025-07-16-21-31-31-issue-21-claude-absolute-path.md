@@ -1,5 +1,5 @@
 # Issue #21: getClaudeAbsolutePath finds bash file, not js file
-**Status:** AwaitingCommit
+**Status:** Done
 **Agent PID:** 8307
 
 ## Original Todo

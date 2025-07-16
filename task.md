@@ -1,5 +1,5 @@
 # Fix fetch abort signal handling in claude-bridge
-**Status:** InProgress
+**Status:** AwaitingCommit
 **Agent PID:** 65895
 
 ## Original Todo
@@ -12,7 +12,7 @@ We need to fix a concurrency bug in claude-bridge where the global.fetch interce
 - [x] Add abort signal handling to claude-bridge interceptor (apps/claude-bridge/src/interceptor.ts:108-116)
 - [x] Extend lemmy types to support abort signals (packages/lemmy/src/types.ts)
 - [x] Update lemmy client implementations (packages/lemmy/src/clients/*.ts)
-- [ ] Integration testing: Manual test with request cancellation
+- [x] Integration testing: Manual test with request cancellation
 
 ## Notes
 [Implementation notes]

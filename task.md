@@ -19,7 +19,7 @@ Here's the detailed plan:
 - [x] Modify cli.ts to display the actual filenames instead of placeholder pattern (apps/claude-trace/src/cli.ts:226)
 - [x] Remove all emojis from console output in cli.ts (multiple locations)
 - [x] Remove all emojis from console output in index-generator.ts (multiple locations)
-- [ ] Remove emojis from interceptor.ts console output (apps/claude-trace/src/interceptor.ts:443,445)
+- [x] Remove emojis from interceptor.ts console output (apps/claude-trace/src/interceptor.ts:443,445)
 - [ ] Remove emojis from interceptor-loader.js console output (apps/claude-trace/src/interceptor-loader.js:20,24)
 - [ ] Test that log filenames are displayed correctly and are clickable
 - [ ] Verify all emojis have been removed from console output

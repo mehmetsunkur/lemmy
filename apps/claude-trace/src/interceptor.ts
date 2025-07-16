@@ -715,9 +715,9 @@ export class ClaudeTrafficLogger {
 		if (shouldOpenBrowser && fs.existsSync(this.htmlFile)) {
 			try {
 				spawn("open", [this.htmlFile], { detached: true, stdio: "ignore" }).unref();
-				console.log(`🌐 Opening ${this.htmlFile} in browser`);
+				console.log(`Opening ${this.htmlFile} in browser`);
 			} catch (error) {
-				console.log(`❌ Failed to open browser: ${error}`);
+				console.log(`Failed to open browser: ${error}`);
 			}
 		}
 	}

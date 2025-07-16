@@ -1,6 +1,6 @@
 # Max completion tokens CLI flag
 **Status:** InProgress
-**Agent PID:** 40175
+**Agent PID:** 46914
 
 ## Original Todo
 apps/claude-bridge we need a way to set max_completion_tokens as a cli flag and override the completion tokens Claude Code specifies in its request.
@@ -46,7 +46,7 @@ apps/claude-bridge we need a way to set max_completion_tokens as a cli flag and 
 Add a `--max-output-tokens` CLI flag to claude-bridge that allows users to override the max output tokens for any provider. This maps to `maxOutputTokens` in the BaseAskOptions, which OpenAI's client then converts to `max_completion_tokens`. This is needed because some models (especially those not in the registry) have stricter token limits than what Claude Code requests by default, causing API errors.
 
 ## Implementation Plan
-- [ ] Add `--max-output-tokens` CLI flag parsing in apps/claude-bridge/src/cli.ts
+- [x] Add `--max-output-tokens` CLI flag parsing in apps/claude-bridge/src/cli.ts
 - [ ] Add `maxOutputTokens?: number` to BridgeConfig interface in apps/claude-bridge/src/types.ts
 - [ ] Serialize entire BridgeConfig to JSON and pass via single CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/cli.ts
 - [ ] Update interceptor to parse BridgeConfig from CLAUDE_BRIDGE_CONFIG env var in apps/claude-bridge/src/interceptor.ts

@@ -45,7 +45,7 @@ export class AnthropicClient implements ChatClient<AnthropicAskOptions> {
 	private buildAnthropicParams(
 		options: AskOptions<AnthropicAskOptions> & StreamingCallbacks,
 		messages: Anthropic.MessageParam[],
-	): Anthropic.MessageCreateParamsStreaming & { signal?: AbortSignal } {
+	): Anthropic.MessageCreateParamsStreaming {
 		const modelData = findModelData(this.config.model);
 		const defaultMaxTokens = options?.maxOutputTokens || modelData?.maxOutputTokens || 4096;
 		const maxThinkingTokens = options?.maxThinkingTokens || this.config.defaults?.maxThinkingTokens || 3000;
@@ -102,13 +102,7 @@ export class AnthropicClient implements ChatClient<AnthropicAskOptions> {
 			params.tools = anthropicTools;
 		}
 
-		// Add abort signal if provided
-		const result: Anthropic.MessageCreateParamsStreaming & { signal?: AbortSignal } = params;
-		if (options.abortSignal) {
-			result.signal = options.abortSignal;
-		}
-
-		return result;
+		return params;
 	}
 
 	async ask(
@@ -166,8 +160,10 @@ export class AnthropicClient implements ChatClient<AnthropicAskOptions> {
 				return { type: "error", error: modelError };
 			}
 
-			// Execute streaming request
-			const stream = await this.anthropic.messages.create(requestParams);
+			// Execute streaming request with abort signal
+			const stream = await this.anthropic.messages.create(requestParams, {
+				signal: options?.abortSignal,
+			});
 
 			return await this.processStream(stream, options, startTime);
 		} catch (error) {

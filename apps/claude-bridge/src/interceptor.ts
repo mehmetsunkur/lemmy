@@ -168,7 +168,11 @@ export class ClaudeBridgeInterceptor {
 			const response =
 				this.config.trace || !transformResult
 					? await originalFetch(input, init)
-					: await this.callProvider(transformResult, requestData.body, init.signal);
+					: await this.callProvider(
+							transformResult,
+							requestData.body,
+							init.signal == null ? undefined : init.signal,
+						);
 
 			// Log everything
 			await this.logComplete(requestData, response, transformResult, requestId);
@@ -456,7 +460,7 @@ export async function initializeInterceptor(config?: BridgeConfig): Promise<Clau
 	if (!process.env["CLAUDE_BRIDGE_CONFIG"]) {
 		throw new Error("CLAUDE_BRIDGE_CONFIG environment variable not set");
 	}
-	
+
 	let defaultConfig: BridgeConfig;
 	try {
 		defaultConfig = JSON.parse(process.env["CLAUDE_BRIDGE_CONFIG"]);

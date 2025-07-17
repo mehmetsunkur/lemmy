@@ -43,7 +43,7 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 	private buildOpenAIParams(
 		options: AskOptions<OpenAIAskOptions> & StreamingCallbacks,
 		messages: OpenAI.Chat.ChatCompletionMessageParam[],
-	): OpenAI.Chat.ChatCompletionCreateParams & { signal?: AbortSignal } {
+	): OpenAI.Chat.ChatCompletionCreateParams {
 		const params: OpenAI.Chat.ChatCompletionCreateParams = {
 			model: this.config.model,
 			stream: true,
@@ -85,13 +85,7 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 			params.tool_choice = options.toolChoice || "auto";
 		}
 
-		// Add abort signal if provided
-		const result: OpenAI.Chat.ChatCompletionCreateParams & { signal?: AbortSignal } = params;
-		if (options.abortSignal) {
-			result.signal = options.abortSignal;
-		}
-
-		return result;
+		return params;
 	}
 
 	async ask(
@@ -153,8 +147,10 @@ export class OpenAIClient implements ChatClient<OpenAIAskOptions> {
 				return { type: "error", error: modelError };
 			}
 
-			// Execute streaming request
-			const stream = await this.openai.chat.completions.create(requestParams);
+			// Execute streaming request with abort signal
+			const stream = await this.openai.chat.completions.create(requestParams, {
+				signal: options?.abortSignal,
+			});
 
 			return await this.processStream(stream as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>, options, startTime);
 		} catch (error) {

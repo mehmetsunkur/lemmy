@@ -10,7 +10,7 @@ Fix claude-trace HTML output to display all logs that exist in JSONL format. The
 
 ## Implementation Plan
 - [x] Remove filtering in HTML generator (claude-trace/src/html-generator.ts)
-- [ ] Update shared conversation processor to preserve all data
+- [x] Update shared conversation processor to preserve all data
 - [ ] Test with referenced files: .claude-trace/log-2025-07-16-20-08-23.jsonl and .claude-trace/log-2025-07-16-20-08-23.html
 - [ ] Verify all logs appear in HTML output
 
